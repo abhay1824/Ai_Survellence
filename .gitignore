@@ -42,6 +42,7 @@ screenshots/
 event_clips/
 debug_crops/
 sample_videos/
+webcam_tests/
 runs/
 
 # Temporary generated test output artifacts
