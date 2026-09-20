@@ -1,0 +1,61 @@
+# Secrets and Environment files
+.env
+*.env
+backend/.env
+
+# Python caches and environments
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+venv/
+.venv/
+env/
+
+# Node and frontend build outputs
+node_modules/
+frontend/node_modules/
+dist/
+build/
+
+# Model weights
+*.pt
+*.onnx
+*.engine
+*.bin
+*.weights
+
+# Datasets and large video / frame dumps
+RWF-2000/
+fight_frames/
+acc/
+accident_frames/
+Dataaset2/
+Dataaset2_YOLO/
+WD/
+ACCIDENT/
+OD-WeaponDetection/
+screenshots/
+event_clips/
+debug_crops/
+sample_videos/
+runs/
+
+# Temporary generated test output artifacts
+fight_test_output.txt
+*.jpg
+*.jpeg
+*.png
+stream_dump.jpg
+summary_report.pdf
+test_report.pdf
+*.lnk
+
+# IDE & OS Files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
