@@ -23,14 +23,18 @@ async def lifespan(app: FastAPI):
     # Startup actions
     await connect_to_mongo()
     
-    # Clean drop collections to eliminate all dummy data on restart
-    try:
-        await get_user_collection().drop()
-        await get_camera_collection().drop()
-        await get_event_collection().drop()
-        logger.info("Cleared previous database collections to purge dummy data.")
-    except Exception as e:
-        logger.error(f"Error dropping collections: {e}")
+    from app.core.database import get_zone_collection
+    if getattr(settings, "RESET_DB_ON_START", False):
+        try:
+            await get_user_collection().drop()
+            await get_camera_collection().drop()
+            await get_event_collection().drop()
+            await get_zone_collection().drop()
+            logger.info("RESET_DB_ON_START is True: Cleared previous database collections.")
+        except Exception as e:
+            logger.error(f"Error dropping collections: {e}")
+    else:
+        logger.info("RESET_DB_ON_START is False: Preserving database collections across restart.")
         
     # Seed initial workspace database objects
     try:

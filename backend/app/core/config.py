@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     # MongoDB Config
     MONGODB_URL: str = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
     DATABASE_NAME: str = "surveillance_db"
+    RESET_DB_ON_START: bool = os.getenv("RESET_DB_ON_START", "false").lower() in ("true", "1", "yes")
     
     # AI Config
     WEAPON_MODEL_PATH: str = os.getenv(
