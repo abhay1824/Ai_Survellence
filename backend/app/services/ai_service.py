@@ -126,8 +126,10 @@ class AIService:
         self.event_collection = None
 
         # Temporal Fight Buffer: { camera_id: deque of last 10 fight predictions (True/False) }
-        # Requires 7/10 frames classified as Fight before triggering alert
         self.fight_buffers = {}
+
+        # Temporal Person Gate Buffer: { camera_id: deque of last 5 bools (2+ persons present) }
+        self.person_gate_buffers = {}
 
         # Fight duration & cooldown tracking: { camera_id: {"start_time": float | None, "active": bool, "non_fight_consecutive": int, "participant_memory": dict, "smoothed_participants": list} }
         self.fight_duration = {}
@@ -185,6 +187,7 @@ class AIService:
         self.weapon_counters.pop(camera_id, None)
         self.accident_counters.pop(camera_id, None)
         self.fight_buffers.pop(camera_id, None)
+        self.person_gate_buffers.pop(camera_id, None)
         self.fight_duration.pop(camera_id, None)
         self.frame_counters.pop(camera_id, None)
         logger.info(f"[AIService] Cleaned up state and trackers for camera: {camera_id}")
@@ -377,9 +380,11 @@ class AIService:
 
         COOLDOWN_FRAMES_THRESHOLD = 15  # Cooldown threshold to declare fight ended
 
-        # Initialize per-camera fight buffer & duration state
+        # Initialize per-camera fight buffer, person gate, and duration state (Config 2)
         if camera_id not in self.fight_buffers:
             self.fight_buffers[camera_id] = deque(maxlen=10)
+        if camera_id not in self.person_gate_buffers:
+            self.person_gate_buffers[camera_id] = deque(maxlen=5)
         if camera_id not in self.fight_duration:
             self.fight_duration[camera_id] = {
                 "start_time": None,
@@ -388,6 +393,12 @@ class AIService:
                 "participant_memory": {},  # {track_id: last_seen_time}
                 "smoothed_participants": [],
             }
+
+        # Config 2: Qualified person count (conf >= 0.35) and 3-of-5 sliding window gate
+        qualified_persons = [d for d in person_detections if d.get("confidence", 0.0) >= 0.35]
+        has_2_persons = (len(qualified_persons) >= 2)
+        self.person_gate_buffers[camera_id].append(has_2_persons)
+        gate_open = (sum(1 for h in self.person_gate_buffers[camera_id] if h) >= 3)
 
         dur_tracker = self.fight_duration[camera_id]
         fight_conf = 0.0
@@ -398,9 +409,8 @@ class AIService:
             fight_conf = fight_conf_override if fight_conf_override is not None else (0.90 if raw_fight else 0.0)
         elif self.fight_model is not None and frame is not None and frame.size > 0:
             try:
-                # In-room physical altercation strictly requires at least 2 people in view.
-                # A single human sitting or standing alone cannot have a physical fight with themselves.
-                if len(person_detections) >= 2:
+                # Altercation strictly requires temporal confirmation of at least 2 people in view
+                if gate_open:
                     results = self.fight_model.predict([frame], verbose=False)
                     if results and results[0].probs is not None:
                         probs = results[0].probs
@@ -418,13 +428,13 @@ class AIService:
         # Push raw result into temporal buffer
         self.fight_buffers[camera_id].append((raw_fight, fight_conf))
 
-        # Temporal confirmation: requires 6/10 frames and at least 2 people
+        # Temporal confirmation: requires 6/10 frames in fight buffer and temporal person gate open
         buf = self.fight_buffers[camera_id]
         fight_frames = sum(1 for f, _ in buf if f)
         if raw_fight_override is not None:
             buffer_confirmed = (fight_frames >= 6)
         else:
-            buffer_confirmed = (len(buf) >= 6 and fight_frames >= 6 and len(person_detections) >= 2)
+            buffer_confirmed = (len(buf) >= 6 and fight_frames >= 6 and gate_open)
 
         # Average confidence over fight frames only
         fight_confs = [c for f, c in buf if f]
