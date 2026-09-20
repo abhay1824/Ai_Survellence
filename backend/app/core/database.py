@@ -34,3 +34,6 @@ def get_camera_collection():
 
 def get_event_collection():
     return db_helper.db["events"]
+
+def get_zone_collection():
+    return db_helper.db["restricted_zones"]

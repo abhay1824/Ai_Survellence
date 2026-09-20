@@ -14,7 +14,7 @@ import base64
 from datetime import datetime
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, status
 from app.core.config import settings
-from app.core.database import get_user_collection, get_database
+from app.core.database import get_user_collection, get_database, get_zone_collection
 from app.services import camera_service, event_service
 from app.services.ai_service import AIService
 from app.services.camera_manager import camera_manager, CameraStatus
@@ -119,9 +119,9 @@ async def ws_stream(websocket: WebSocket, camera_id: str, token: str = Query(...
             source_url=camera.get("stream_url", "synthetic"),
         )
 
-    # Fetch zones
-    db = get_database()
-    cursor = db["zones"].find({"camera_id": camera_id})
+    # Fetch zones using unified get_zone_collection()
+    zone_col = get_zone_collection()
+    cursor = zone_col.find({"camera_id": camera_id})
     zones = [doc async for doc in cursor]
 
     frame_num = 0
@@ -172,6 +172,11 @@ async def ws_stream(websocket: WebSocket, camera_id: str, token: str = Query(...
                     frame = generate_offline_frame(camera_name, frame_num)
                 else:
                     frame_num += 1
+
+                # Periodically refresh zones from DB every 30 frames (approx 2s)
+                if frame_num % 30 == 0:
+                    cursor = zone_col.find({"camera_id": camera_id})
+                    zones = [doc async for doc in cursor]
 
                 # 3. AI Processing (Offloaded to worker thread to prevent event-loop freezing)
                 (

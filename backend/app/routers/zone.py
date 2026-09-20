@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
-from app.core.database import get_database
+from app.core.database import get_database, get_zone_collection
 from app.schemas.zone import ZoneCreate, ZoneResponse, ZoneUpdate
 from app.routers.auth import RoleChecker
 
@@ -9,10 +9,6 @@ router = APIRouter(prefix="/zones", tags=["zones"])
 
 allow_all = RoleChecker(["Super Admin", "Police Admin", "Control Room Operator", "Viewer"])
 allow_admin = RoleChecker(["Super Admin", "Police Admin"])
-
-def get_zone_collection():
-    db = get_database()
-    return db["restricted_zones"]
 
 @router.get("/camera/{camera_id}", response_model=list[ZoneResponse])
 async def get_zones_by_camera(camera_id: str, current_user: dict = Depends(allow_all)):
