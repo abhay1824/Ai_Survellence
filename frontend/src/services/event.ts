@@ -75,6 +75,26 @@ export const eventService = {
     window.URL.revokeObjectURL(url);
   },
 
+  async downloadExportCSV(filters: { start_date?: string; end_date?: string; camera_id?: string } = {}): Promise<void> {
+    const response = await api.get('/events/export', {
+      params: { ...filters, format: 'csv' },
+      responseType: 'blob'
+    });
+    const blob = new Blob([response.data], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `incident_events_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
+  async deleteEvent(eventId: string): Promise<void> {
+    await api.delete(`/events/${eventId}`);
+  },
+
   getExportPDFUrl(filters: { start_date?: string; end_date?: string } = {}): string {
     const token = localStorage.getItem('token') || '';
     const params = new URLSearchParams({ ...filters, token });

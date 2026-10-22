@@ -1,62 +1,91 @@
-# Secrets and Environment files
+# ==============================================================================
+# AEGIS Smart Surveillance SOC — Monorepo Git Ignore Rules
+# ==============================================================================
+
+# 1. Environment & Secret Credentials
 .env
 *.env
 backend/.env
+frontend/.env
+*.pem
+*.key
 
-# Python caches and environments
+# 2. Python Caches & Environments
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*/__pycache__/
+*/*/__pycache__/
+*.py[cod]
+*$py.class
 .pytest_cache/
+*/.pytest_cache/
 .coverage
 htmlcov/
 venv/
 .venv/
 env/
+ENV/
 
-# Node and frontend build outputs
+# 3. Node & Frontend Build Artifacts
 node_modules/
 frontend/node_modules/
 dist/
+frontend/dist/
 build/
+.next/
+*.tsbuildinfo
 
-# Model weights
+# 4. Model Weights & Inference Artifacts (Large Files)
 *.pt
 *.onnx
 *.engine
 *.bin
 *.weights
+!weights/.gitkeep
 
-# Datasets and large video / frame dumps
-RWF-2000/
-fight_frames/
-acc/
-accident_frames/
+# 5. Raw Datasets & Training Dumps
+ACCIDENT/
 Dataaset2/
 Dataaset2_YOLO/
-WD/
-ACCIDENT/
 OD-WeaponDetection/
-screenshots/
-event_clips/
+RWF-2000/
+WD/
+acc/
+accident_frames/
+fight_frames/
 debug_crops/
-sample_videos/
-webcam_tests/
+hard_negatives/
+demo_images/
 runs/
 
-# Temporary generated test output artifacts
-fight_test_output.txt
+# 6. Runtime Media Outputs (keep folder structure via .gitkeep)
+event_clips/*
+!event_clips/.gitkeep
+screenshots/*
+!screenshots/.gitkeep
+backend/event_clips/*
+!backend/event_clips/.gitkeep
+backend/screenshots/*
+!backend/screenshots/.gitkeep
+sample_videos/*.mp4
+sample_videos/*.avi
+
+# 7. Scratch & Temporary Experiment Artifacts
+scratch/
 *.jpg
 *.jpeg
 *.png
-stream_dump.jpg
-summary_report.pdf
-test_report.pdf
+!backend/tests/fixtures/*.jpg
+!backend/tests/fixtures/*.png
+*.mp4
+!backend/tests/fixtures/*.mp4
+*.pdf
+!backend/tests/fixtures/*.pdf
+*.csv
 *.lnk
 
-# IDE & OS Files
+# 8. OS & IDE Metadata
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
+desktop.ini

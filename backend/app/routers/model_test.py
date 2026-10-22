@@ -71,6 +71,8 @@ PRESET_SAMPLES = {
 }
 
 
+@router.get("")
+@router.get("/")
 @router.get("/status")
 def get_models_status():
     """Returns operational status, loaded weights, and class mappings for all models."""
@@ -200,7 +202,7 @@ async def run_model_inference(
                     "confidence": round(top_conf, 4),
                     "is_fight": is_fight,
                     "probabilities": probs_dict,
-                    "model": "runs/classify/fight_classifier/weights/best.pt"
+                    "model": getattr(settings, "FIGHT_MODEL_PATH", "weights/fight_yolo11n_cls.pt")
                 }
         except Exception as e:
             logger.error(f"Fight prediction error: {e}")

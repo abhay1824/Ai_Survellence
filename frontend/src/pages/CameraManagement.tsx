@@ -53,8 +53,8 @@ export const CameraManagement: React.FC = () => {
     setModalMode('create');
     setCameraIdField(`CAM-${String(cameras.length + 1).padStart(3, '0')}`);
     setCameraNameField('');
-    setLatField(12.9716);
-    setLonField(77.5946);
+    setLatField(16.8302);
+    setLonField(75.7100);
     setStreamUrlField('');
     setStatusField('Offline');
     setFormError('');
@@ -313,7 +313,7 @@ export const CameraManagement: React.FC = () => {
                       required
                       value={latField}
                       onChange={(e) => setLatField(Number(e.target.value))}
-                      placeholder="12.9716"
+                      placeholder="16.8302"
                       className="w-full bg-zinc-900 border border-zinc-800 rounded-lg py-2 px-3 text-zinc-200 text-xs focus:outline-none focus:border-blue-500"
                     />
                   </div>
@@ -327,7 +327,7 @@ export const CameraManagement: React.FC = () => {
                       required
                       value={lonField}
                       onChange={(e) => setLonField(Number(e.target.value))}
-                      placeholder="77.5946"
+                      placeholder="75.7100"
                       className="w-full bg-zinc-900 border border-zinc-800 rounded-lg py-2 px-3 text-zinc-200 text-xs focus:outline-none focus:border-blue-500"
                     />
                   </div>

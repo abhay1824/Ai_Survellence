@@ -34,6 +34,16 @@ async def get_camera_health(current_user: dict = Depends(allow_all)):
     """Real-time camera health from CameraManager workers."""
     health_data = camera_manager.get_all_health()
     if health_data:
+        try:
+            db_cams = await camera_service.get_all_cameras()
+            cam_name_map = {c["camera_id"]: c["camera_name"] for c in db_cams}
+            for h in health_data:
+                cid = h.get("camera_id")
+                if cid in cam_name_map:
+                    h["camera_name"] = cam_name_map[cid]
+                    camera_manager.update_camera_name(cid, cam_name_map[cid])
+        except Exception:
+            pass
         return health_data
     # Fallback to DB-based health if no workers running
     return await camera_service.get_camera_health()
@@ -44,6 +54,12 @@ async def get_single_camera_health(camera_id: str, current_user: dict = Depends(
     """Real-time health for a single camera."""
     health = camera_manager.get_health(camera_id)
     if health:
+        try:
+            cam = await camera_service.get_camera_by_code(camera_id)
+            if cam:
+                health["camera_name"] = cam.get("camera_name", health.get("camera_name"))
+        except Exception:
+            pass
         return health
     raise HTTPException(status_code=404, detail=f"Camera {camera_id} not found or not running")
 
@@ -124,11 +140,15 @@ async def update_camera(id: str, camera_in: CameraUpdate, current_user: dict = D
     if updated_cam:
         cam_code = updated_cam.get("camera_id")
         new_url = updated_cam.get("stream_url")
-        if cam_code and new_url:
-            if camera_manager.is_camera_running(cam_code):
-                camera_manager.update_camera_source(cam_code, new_url)
-            else:
-                camera_manager.start_camera(cam_code, updated_cam.get("camera_name", cam_code), new_url)
+        new_name = updated_cam.get("camera_name")
+        if cam_code:
+            if new_name:
+                camera_manager.update_camera_name(cam_code, new_name)
+            if new_url:
+                if camera_manager.is_camera_running(cam_code):
+                    camera_manager.update_camera_source(cam_code, new_url)
+                else:
+                    camera_manager.start_camera(cam_code, new_name or cam_code, new_url)
     return updated_cam
 
 

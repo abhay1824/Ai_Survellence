@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import type { ThreatLevel } from '../../types/surveillance';
+import { SIREN_TRIGGER_LEVELS } from '../../constants/alertLevels';
 
 interface SirenAudioPlayerProps {
   threatLevel: ThreatLevel;
@@ -13,7 +14,7 @@ export const SirenAudioPlayer: React.FC<SirenAudioPlayerProps> = ({ threatLevel,
   const intervalRef = useRef<any>(null);
 
   useEffect(() => {
-    if (threatLevel === 'CRITICAL' && !muted) {
+    if (SIREN_TRIGGER_LEVELS.includes(threatLevel) && !muted) {
       startSiren();
     } else {
       stopSiren();

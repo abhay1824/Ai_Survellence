@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Shield, Radio, Video, Sliders, Database, BarChart3, LogOut, User, Search, Activity, Mail, Cpu } from 'lucide-react';
+import { Shield, MapPin, Video, Sliders, Database, LogOut, User, Search, Mail } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const navigate = useNavigate();
@@ -26,15 +26,12 @@ export const Navbar: React.FC = () => {
   };
 
   const navItems = [
-    { name: 'Command Center', path: '/', icon: Radio },
+    { name: 'GPS Tracking', path: '/', icon: MapPin },
     { name: 'Live Monitoring', path: '/monitoring', icon: Video },
     { name: 'Forensics', path: '/forensics', icon: Search },
-    { name: 'Camera Health', path: '/health', icon: Activity },
-    { name: 'Cameras', path: '/cameras', icon: Sliders },
     { name: 'Event Log', path: '/events', icon: Database },
-    { name: 'Analytics', path: '/reports', icon: BarChart3 },
-    { name: 'Model Lab', path: '/model-test', icon: Cpu },
-    { name: 'Email Settings', path: '/settings/email', icon: Mail },
+    { name: 'Cameras', path: '/cameras', icon: Sliders },
+    { name: 'Email Alerts', path: '/settings/email', icon: Mail },
   ];
 
   return (

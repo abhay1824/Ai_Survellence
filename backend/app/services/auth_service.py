@@ -17,7 +17,7 @@ async def seed_users():
     if count == 0:
         logger.info("No users found in DB. Seeding initial command center roles...")
         initial_users = [
-            ("admin", "admin123", "Super Admin", "admin@company.com"),
+            ("admin", "admin123", "Super Admin", "shabella271@gmail.com"),
             ("police", "police123", "Police Admin", "police@company.com"),
             ("operator", "operator123", "Control Room Operator", "operator@company.com"),
             ("viewer", "viewer123", "Viewer", "viewer@company.com"),
@@ -28,7 +28,7 @@ async def seed_users():
                 password_hash=get_password_hash(password),
                 role=role,
                 email=email,
-                notification_emails=[],
+                notification_emails=["shabella271@gmail.com"] if username == "admin" else [],
                 email_notifications_enabled=True,
                 critical_alerts_enabled=True,
                 daily_report_enabled=False,
@@ -37,7 +37,14 @@ async def seed_users():
             await user_col.insert_one(user_in.model_dump())
         logger.info("Successfully seeded 4 roles/users with email notification fields.")
     else:
-        logger.info("Users exist in database. Skipping seed.")
+        logger.info("Users exist in database. Updating admin recipient email to shabella271@gmail.com...")
+        await user_col.update_one(
+            {"username": "admin"},
+            {
+                "$set": {"email": "shabella271@gmail.com"},
+                "$addToSet": {"notification_emails": "shabella271@gmail.com"}
+            }
+        )
 
 async def authenticate_user(username: str, password: str) -> dict:
     user_col = get_user_collection()

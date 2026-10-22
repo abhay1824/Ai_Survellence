@@ -108,6 +108,11 @@ async def escalate_event(event_id: str, current_user: dict = Depends(allow_opera
     """MODULE 7: Escalate Alarm Event."""
     return await event_service.escalate_alarm(event_id)
 
+@router.delete("/{event_id}")
+async def delete_event(event_id: str, current_user: dict = Depends(allow_operator)):
+    """Delete an event and its associated screenshot file."""
+    return await event_service.delete_event(event_id)
+
 @router.get("/export")
 async def export_events(
     start_date: str = Query(None),
@@ -212,10 +217,10 @@ async def get_threat_heatmap(current_user: dict = Depends(allow_all)):
     cursor = collection.find().limit(500)
     heatmap_points = []
     
-    # Campus reference GPS center (e.g. 12.9716, 77.5946)
+    # Campus reference GPS center (Vijayapura: 16.8302, 75.7100)
     async for event_doc in cursor:
-        lat = event_doc.get("latitude", 12.9716)
-        lng = event_doc.get("longitude", 77.5946)
+        lat = event_doc.get("latitude", 16.8302)
+        lng = event_doc.get("longitude", 75.7100)
         score = event_doc.get("threat_score", 50)
         level = event_doc.get("threat_level", "MEDIUM")
         
@@ -227,17 +232,17 @@ async def get_threat_heatmap(current_user: dict = Depends(allow_all)):
             "intensity": intensity,
             "threat_score": score,
             "threat_level": level,
-            "camera_id": event_doc.get("camera_id", "CAM-01"),
+            "camera_id": event_doc.get("camera_id", "CAM-001"),
             "event_type": event_doc.get("event_type", "Threat Detected")
         })
 
-    # If empty, return realistic sample campus hotspot clusters
+    # If empty, return realistic sample campus hotspot clusters in Vijayapura
     if not heatmap_points:
         heatmap_points = [
-            {"lat": 12.9716, "lng": 77.5946, "intensity": 0.95, "threat_score": 92, "threat_level": "CRITICAL", "camera_id": "CAM-01", "event_type": "Pistol Detected"},
-            {"lat": 12.9720, "lng": 77.5950, "intensity": 0.85, "threat_score": 85, "threat_level": "HIGH", "camera_id": "CAM-03", "event_type": "Restricted Area Intrusion"},
-            {"lat": 12.9710, "lng": 77.5940, "intensity": 0.45, "threat_score": 45, "threat_level": "MEDIUM", "camera_id": "CAM-02", "event_type": "Loitering Detected"},
-            {"lat": 12.9725, "lng": 77.5955, "intensity": 0.20, "threat_score": 20, "threat_level": "LOW", "camera_id": "CAM-04", "event_type": "Unattended Object"}
+            {"lat": 16.8302, "lng": 75.7100, "intensity": 0.95, "threat_score": 92, "threat_level": "CRITICAL", "camera_id": "CAM-001", "event_type": "Pistol Detected"},
+            {"lat": 16.8280, "lng": 75.7180, "intensity": 0.85, "threat_score": 85, "threat_level": "HIGH", "camera_id": "CAM-003", "event_type": "Restricted Area Intrusion"},
+            {"lat": 16.8350, "lng": 75.7050, "intensity": 0.45, "threat_score": 45, "threat_level": "MEDIUM", "camera_id": "CAM-002", "event_type": "Loitering Detected"},
+            {"lat": 16.8220, "lng": 75.7150, "intensity": 0.20, "threat_score": 20, "threat_level": "LOW", "camera_id": "CAM-004", "event_type": "Unattended Object"}
         ]
         
     return {"points": heatmap_points, "total_hotspots": len(heatmap_points)}

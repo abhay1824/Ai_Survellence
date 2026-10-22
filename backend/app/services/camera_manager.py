@@ -668,6 +668,16 @@ class CameraManager:
             return True
         return False
 
+    def update_camera_name(self, camera_id: str, new_name: str) -> bool:
+        """Update the display name for a running camera worker."""
+        with self._lock:
+            worker = self._workers.get(camera_id)
+            if worker:
+                worker.camera_name = new_name
+                worker.stats.camera_name = new_name
+                return True
+        return False
+
     @staticmethod
     def detect_available_webcams(max_index: int = 5) -> list[dict]:
         """Probe local webcam indices 0-N and return available devices."""

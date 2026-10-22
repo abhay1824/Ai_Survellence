@@ -39,6 +39,7 @@ const App: React.FC = () => {
                       <Route path="/events" element={<EventHistory />} />
                       <Route path="/reports" element={<AnalyticsReport />} />
                       <Route path="/settings/email" element={<EmailSettings />} />
+                      <Route path="/email" element={<EmailSettings />} />
                       <Route path="/model-test" element={<ModelTesting />} />
                       <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>

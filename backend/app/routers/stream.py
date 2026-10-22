@@ -103,8 +103,8 @@ async def ws_stream(websocket: WebSocket, camera_id: str, token: str = Query(...
                 "camera_id": camera_id,
                 "camera_name": f"Surveillance Node {camera_id.split('-')[-1]}",
                 "stream_url": "synthetic",
-                "latitude": 12.9716,
-                "longitude": 77.5946,
+                "latitude": 16.8302,
+                "longitude": 75.7100,
                 "status": "Online"
             }
         else:
@@ -166,12 +166,11 @@ async def ws_stream(websocket: WebSocket, camera_id: str, token: str = Query(...
                 # 1. Get latest frame (prefer client browser webcam frame if present, else CameraManager worker frame)
                 frame = client_frame if client_frame is not None else camera_manager.get_frame(camera_id)
 
+                frame_num += 1
+
                 # 2. Fallback to offline frame if no frame available
                 if frame is None:
-                    frame_num += 1
                     frame = generate_offline_frame(camera_name, frame_num)
-                else:
-                    frame_num += 1
 
                 # Periodically refresh zones from DB every 30 frames (approx 2s)
                 if frame_num % 30 == 0:
@@ -294,3 +293,4 @@ async def ws_stream(websocket: WebSocket, camera_id: str, token: str = Query(...
         logger.error(f"[WebSocket] Stream error on {camera_id}: {e}")
     finally:
         reader_task.cancel()
+        ai_service.cleanup_camera(camera_id)

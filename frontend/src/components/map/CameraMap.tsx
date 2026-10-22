@@ -65,7 +65,7 @@ interface CameraMapProps {
 
 export const CameraMap: React.FC<CameraMapProps> = ({ 
   cameras, 
-  center = [12.9716, 77.5946], // Default Bengaluru Karnataka India
+  center = [16.8302, 75.7100], // Default Vijayapura Karnataka India
   zoom = 12 
 }) => {
   return (

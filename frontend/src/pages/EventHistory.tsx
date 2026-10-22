@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Database, Filter, Download, Eye, ExternalLink, Brain, Mail } from 'lucide-react';
+import { Database, Filter, Download, Eye, Brain, Mail, Trash2 } from 'lucide-react';
 import CommandCenterLayout from '../layouts/CommandCenterLayout';
 import { eventService } from '../services/event';
 import { cameraService } from '../services/camera';
 import type { EventFilters } from '../services/event';
 import type { SurveillanceEvent, Camera, XAIExplanation } from '../types';
-import { XAIExplanationModal } from '../components/XAIExplanationModal';
+import { XAIExplanationModal } from '../components/modals/XAIExplanationModal';
 import api from '../services/api';
 
 export const EventHistory: React.FC = () => {
@@ -25,7 +25,7 @@ export const EventHistory: React.FC = () => {
   const [exporting, setExporting] = useState(false);
 
   // Evidence & XAI view states
-  const [viewImage, setViewImage] = useState<string | null>(null);
+  const [viewImageEvent, setViewImageEvent] = useState<SurveillanceEvent | null>(null);
   const [selectedXAIEvent, setSelectedXAIEvent] = useState<SurveillanceEvent | null>(null);
   const [xaiExplanation, setXAIExplanation] = useState<XAIExplanation | null>(null);
   const [isXAIModalOpen, setIsXAIModalOpen] = useState(false);
@@ -164,7 +164,7 @@ export const EventHistory: React.FC = () => {
               >
                 <option value="">All cameras</option>
                 {cameras.map((c) => (
-                  <option key={c._id} value={c.camera_id}>{c.camera_id} - {c.camera_name}</option>
+                  <option key={c._id} value={c.camera_id}>{c.camera_name}</option>
                 ))}
               </select>
             </div>
@@ -339,7 +339,7 @@ export const EventHistory: React.FC = () => {
 
                             {evt.image_path ? (
                               <button
-                                onClick={() => setViewImage(`http://localhost:8000${evt.image_path}`)}
+                                onClick={() => setViewImageEvent(evt)}
                                 className="flex items-center space-x-1.5 text-xs bg-zinc-900 hover:bg-zinc-800 border border-zinc-805 text-blue-400 font-bold px-2.5 py-1.5 rounded transition uppercase tracking-wider"
                               >
                                 <Eye className="h-3.5 w-3.5" />
@@ -347,18 +347,6 @@ export const EventHistory: React.FC = () => {
                               </button>
                             ) : (
                               <span className="text-zinc-650 text-xs">No Capture</span>
-                            )}
-                            
-                            {evt.video_path && (
-                              <a
-                                href={`http://localhost:8000${evt.video_path}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="flex items-center space-x-1.5 text-xs bg-zinc-900 hover:bg-zinc-800 border border-zinc-805 text-amber-400 font-bold px-2.5 py-1.5 rounded transition uppercase tracking-wider"
-                              >
-                                <ExternalLink className="h-3.5 w-3.5" />
-                                <span>Clip</span>
-                              </a>
                             )}
                           </div>
                         </td>
@@ -403,21 +391,40 @@ export const EventHistory: React.FC = () => {
         </div>
 
         {/* Modal: View Capture Image */}
-        {viewImage && (
+        {viewImageEvent && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-            <div className="absolute inset-0 bg-black/90" onClick={() => setViewImage(null)} />
+            <div className="absolute inset-0 bg-black/90" onClick={() => setViewImageEvent(null)} />
             <div className="relative w-full max-w-2xl bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden z-10 p-4">
               <div className="flex justify-between items-center mb-3">
                 <span className="text-xs font-bold text-zinc-450 uppercase tracking-widest">Surveillance Evidence Capture</span>
-                <button 
-                  onClick={() => setViewImage(null)}
-                  className="text-xs text-zinc-550 hover:text-zinc-300 font-bold uppercase tracking-wider"
-                >
-                  Close
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={async () => {
+                      const idToDelete = viewImageEvent.event_id || viewImageEvent._id;
+                      if (!window.confirm('Delete this surveillance evidence image?')) return;
+                      try {
+                        await eventService.deleteEvent(idToDelete);
+                        setEvents(prev => prev.filter(ev => ev.event_id !== idToDelete && ev._id !== idToDelete));
+                        setViewImageEvent(null);
+                      } catch (err) {
+                        console.error('Delete failed:', err);
+                        alert('Failed to delete image.');
+                      }
+                    }}
+                    className="bg-red-950/80 hover:bg-red-900 border border-red-800 text-red-300 text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition font-semibold"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Delete Image
+                  </button>
+                  <button 
+                    onClick={() => setViewImageEvent(null)}
+                    className="text-xs text-zinc-550 hover:text-zinc-300 font-bold uppercase tracking-wider px-2 py-1"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
               <img 
-                src={viewImage} 
+                src={`http://localhost:8000${viewImageEvent.image_path}`} 
                 alt="Captured Surveillance Bounding Box Details" 
                 className="w-full rounded-lg border border-zinc-850"
               />

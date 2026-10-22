@@ -1,3 +1,8 @@
+/**
+ * Legacy/Alternative Dashboard View
+ * Note: CommandCenter.tsx is the primary live command center route ('/').
+ * This component is retained for standalone analytical overview reporting.
+ */
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Video, ShieldAlert, Activity, AlertCircle, RefreshCw, Layers, Car } from 'lucide-react';
@@ -39,52 +44,6 @@ export const Dashboard: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const lat = position.coords.latitude;
-          const lon = position.coords.longitude;
-          setMapCenter([lat, lon]);
-          
-          try {
-            // Update camera coordinates in MongoDB to position them around the user's location
-            const camerasList = await cameraService.getCameras();
-            const updates = [
-              { code: 'CAM-001', latOffset: 0.0, lonOffset: 0.0 },
-              { code: 'CAM-002', latOffset: 0.0008, lonOffset: 0.0008 },
-              { code: 'CAM-003', latOffset: -0.0008, lonOffset: -0.0008 }
-            ];
-            
-            let updatedAny = false;
-            for (const item of updates) {
-              const target = camerasList.find(c => c.camera_id === item.code);
-              if (target) {
-                const diffLat = Math.abs(target.latitude - (lat + item.latOffset));
-                const diffLon = Math.abs(target.longitude - (lon + item.lonOffset));
-                if (diffLat > 0.0001 || diffLon > 0.0001) {
-                  await cameraService.updateCamera(target._id || target.camera_id, {
-                    latitude: lat + item.latOffset,
-                    longitude: lon + item.lonOffset
-                  });
-                  updatedAny = true;
-                }
-              }
-            }
-            if (updatedAny) {
-              const refreshedCameras = await cameraService.getCameras();
-              setCameras(refreshedCameras);
-            }
-          } catch (error) {
-            console.error('Failed to align camera coordinates with user location:', error);
-          }
-        },
-        (error) => {
-          console.warn('Geolocation access failed:', error);
-        }
-      );
-    }
-  }, []);
 
   const handleRefresh = () => {
     setRefreshing(true);

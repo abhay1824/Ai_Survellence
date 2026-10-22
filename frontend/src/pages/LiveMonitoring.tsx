@@ -3,11 +3,12 @@ import { useSearchParams } from 'react-router-dom';
 import type { Camera, SurveillanceEvent } from '../types';
 import { cameraService } from '../services/camera';
 import { WS_BASE_URL } from '../services/api';
-import { Video, AlertOctagon, Heart, MapPin, Eye, BellRing, Settings, Loader, Brain, Mail } from 'lucide-react';
+import { Video, AlertOctagon, Heart, MapPin, Eye, Settings, Loader, Brain, Mail, Activity, AlertTriangle, CheckCircle, Radio, Zap, ShieldAlert, VideoOff } from 'lucide-react';
 import CommandCenterLayout from '../layouts/CommandCenterLayout';
 import { CameraGridCell } from '../components/monitoring/CameraGridCell';
-import { XAIExplanationModal } from '../components/XAIExplanationModal';
-import type { XAIExplanation } from '../types/surveillance';
+import { XAIExplanationModal } from '../components/modals/XAIExplanationModal';
+import type { XAIExplanation, CameraHealth } from '../types/surveillance';
+import { SIREN_TRIGGER_LEVELS } from '../constants/alertLevels';
 
 export const LiveMonitoring: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -38,7 +39,60 @@ export const LiveMonitoring: React.FC = () => {
   const [criticalThreatName, setCriticalThreatName] = useState('');
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
   const [alertModalImage, setAlertModalImage] = useState<string | null>(null);
-  const [recentDetectionsHistory, setRecentDetectionsHistory] = useState<SurveillanceEvent[]>([]);
+  
+  // Camera Health & Telemetry State
+  const [healthList, setHealthList] = useState<CameraHealth[]>([]);
+
+  const loadHealth = async () => {
+    try {
+      const data = await cameraService.getCameraHealth();
+      setHealthList(data);
+    } catch (err) {
+      console.error('Camera health fetch error:', err);
+    }
+  };
+
+  useEffect(() => {
+    loadHealth();
+    const interval = setInterval(loadHealth, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const getStatusBadge = (status: string, freeze: boolean, tamper: boolean) => {
+    if (status === 'No Video Input') {
+      return (
+        <span className="bg-amber-950/80 text-amber-400 border border-amber-800 text-[10px] px-2 py-0.5 rounded font-mono font-bold flex items-center gap-1">
+          <VideoOff className="w-3 h-3" /> NO VIDEO INPUT
+        </span>
+      );
+    }
+    if (tamper) {
+      return (
+        <span className="bg-purple-950 text-purple-400 border border-purple-800 text-[10px] px-2 py-0.5 rounded font-mono font-bold flex items-center gap-1 animate-pulse">
+          <ShieldAlert className="w-3 h-3" /> TAMPERED / COVERED
+        </span>
+      );
+    }
+    if (freeze) {
+      return (
+        <span className="bg-yellow-950 text-yellow-400 border border-yellow-800 text-[10px] px-2 py-0.5 rounded font-mono font-bold flex items-center gap-1">
+          <AlertTriangle className="w-3 h-3" /> FRAME FREEZE
+        </span>
+      );
+    }
+    if (status === 'Offline') {
+      return (
+        <span className="bg-zinc-800 text-zinc-400 border border-zinc-700 text-[10px] px-2 py-0.5 rounded font-mono font-bold">
+          OFFLINE
+        </span>
+      );
+    }
+    return (
+      <span className="bg-emerald-950 text-emerald-400 border border-emerald-800 text-[10px] px-2 py-0.5 rounded font-mono font-bold flex items-center gap-1">
+        <CheckCircle className="w-3 h-3" /> ONLINE & STABLE
+      </span>
+    );
+  };
 
   // XAI Explanation States
   const [activeXAIExplanation, setActiveXAIExplanation] = useState<XAIExplanation | null>(null);
@@ -53,6 +107,40 @@ export const LiveMonitoring: React.FC = () => {
   const lastFrameTime = useRef<number>(Date.now());
   const fpsInterval = useRef<any>(null);
   const frameCount = useRef<number>(0);
+
+  // Alert dismiss latch (keyed by camera_id|event_type)
+  const dismissedAlertsRef = useRef<{ [key: string]: number }>({});
+  const activeAlertKeyRef = useRef<string | null>(null);
+  const recentAlertKeysRef = useRef<{ [key: string]: number }>({});
+
+  const isAlertDismissed = (camId: string, eventType: string): boolean => {
+    const key = `${camId}|${eventType}`;
+    const now = Date.now();
+    const lastSeen = dismissedAlertsRef.current[key];
+    if (lastSeen !== undefined) {
+      if (now - lastSeen > 3000) {
+        delete dismissedAlertsRef.current[key];
+        return false;
+      }
+      dismissedAlertsRef.current[key] = now;
+      return true;
+    }
+    return false;
+  };
+
+  const handleDismissModal = () => {
+    setIsAlertModalOpen(false);
+    setAlarmActive(false);
+    const now = Date.now();
+    if (activeAlertKeyRef.current) {
+      dismissedAlertsRef.current[activeAlertKeyRef.current] = now;
+    }
+    Object.entries(recentAlertKeysRef.current).forEach(([key, timestamp]) => {
+      if (now - timestamp <= 1500) {
+        dismissedAlertsRef.current[key] = now;
+      }
+    });
+  };
 
   // Synthesize alarm sound using Web Audio API (completely client-side, offline ready!)
   const triggerAudioSiren = () => {
@@ -198,27 +286,14 @@ export const LiveMonitoring: React.FC = () => {
         // Process alerts
         if (data.alerts && data.alerts.length > 0) {
           data.alerts.forEach((alert: any) => {
-            // Append to local history list
-            const mockEvent: SurveillanceEvent = {
-              _id: String(Math.random()),
-              event_id: String(Math.random()),
-              camera_id: selectedCamera.camera_id,
-              event_type: alert.event_type,
-              threat_level: alert.threat_level,
-              threat_score: data.threat_score || 50,
-              status: 'ACTIVE',
-              confidence: alert.confidence,
-              latitude: selectedCamera.latitude,
-              longitude: selectedCamera.longitude,
-              xai_explanation: data.xai_explanation,
-              image_path: null,
-              video_path: null,
-              timestamp: alert.timestamp
-            };
-            setRecentDetectionsHistory(prev => [mockEvent, ...prev].slice(0, 15));
+            // Trigger visual alarms and modal if threat is in trigger levels and not latched/dismissed
+            const camId = selectedCamera?.camera_id || 'CAM-001';
+            const alertKey = `${camId}|${alert.event_type}`;
+            recentAlertKeysRef.current[alertKey] = Date.now();
+            const dismissed = isAlertDismissed(camId, alert.event_type);
 
-            // Trigger visual alarms if threat is CRITICAL
-            if (alert.threat_level === 'CRITICAL') {
+            if (!dismissed && SIREN_TRIGGER_LEVELS.includes(alert.threat_level)) {
+              activeAlertKeyRef.current = alertKey;
               setAlarmActive(true);
               setCriticalThreatName(alert.event_type);
               triggerAudioSiren();
@@ -309,8 +384,7 @@ export const LiveMonitoring: React.FC = () => {
   };
 
   const handleAcknowledgeAlarm = () => {
-    setAlarmActive(false);
-    setIsAlertModalOpen(false);
+    handleDismissModal();
     setEmailAlertSent(false);
     setEmailRecipientCount(0);
   };
@@ -333,7 +407,7 @@ export const LiveMonitoring: React.FC = () => {
                 >
                   {cameras.map((c) => (
                     <option key={c._id || c.camera_id} value={c.camera_id}>
-                      {c.camera_name} ({c.camera_id})
+                      {c.camera_name}
                     </option>
                   ))}
                 </select>
@@ -594,7 +668,7 @@ export const LiveMonitoring: React.FC = () => {
               // Get camera properties
               const camObj = cameras[index % (cameras.length || 1)];
               const camCode = camObj ? camObj.camera_id : `CAM-${String(index + 1).padStart(3, '0')}`;
-              const camName = camObj ? camObj.camera_name : `Surveillance Node ${index + 1}`;
+              const camName = camObj ? camObj.camera_name : `Cam ${index + 1}`;
               const stream = camObj ? camObj.stream_url : '0';
 
               return (
@@ -604,30 +678,19 @@ export const LiveMonitoring: React.FC = () => {
                   cameraName={camName}
                   streamUrl={stream}
                   onAlertTriggered={(alert) => {
-                    // Update global alert state if critical threat is found
-                    if (alert.threat_level === 'CRITICAL') {
+                    const alertKey = `${camCode}|${alert.event_type}`;
+                    recentAlertKeysRef.current[alertKey] = Date.now();
+                    const dismissed = isAlertDismissed(camCode, alert.event_type);
+
+                    // Update global alert state and open modal if threat is in trigger levels and not latched/dismissed
+                    if (!dismissed && SIREN_TRIGGER_LEVELS.includes(alert.threat_level)) {
+                      activeAlertKeyRef.current = alertKey;
                       setCriticalThreatName(alert.event_type);
                       setAlertModalImage(alert.frame);
                       setAlarmActive(true);
+                      setIsAlertModalOpen(true);
                       triggerAudioSiren();
                     }
-                    // Log to the incident history
-                    const mockEvent: SurveillanceEvent = {
-                      _id: String(Math.random()),
-                      event_id: String(Math.random()),
-                      camera_id: camCode,
-                      event_type: alert.event_type,
-                      threat_level: alert.threat_level as any,
-                      threat_score: 50,
-                      status: 'ACTIVE',
-                      confidence: alert.confidence,
-                      latitude: selectedCamera?.latitude || 0.0,
-                      longitude: selectedCamera?.longitude || 0.0,
-                      image_path: null,
-                      video_path: null,
-                      timestamp: new Date().toISOString()
-                    };
-                    setRecentDetectionsHistory(prev => [mockEvent, ...prev].slice(0, 15));
                   }}
                 />
               );
@@ -635,84 +698,71 @@ export const LiveMonitoring: React.FC = () => {
           </div>
         )}
 
-        {/* BOTTOM: Detection History */}
+        {/* BOTTOM: Camera Health & Telemetry (Integrated) */}
         <div className="space-y-4">
-          <div className="flex items-center space-x-2">
-            <BellRing className="h-5 w-5 text-zinc-400" />
-            <h2 className="text-md font-bold tracking-wider text-zinc-300 uppercase">
-              Incident Alert Stream
-            </h2>
-          </div>
-          <div className="glass-panel rounded-xl border border-zinc-800 overflow-hidden">
-            <div className="overflow-x-auto max-h-72">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-zinc-800 bg-zinc-900/40 text-xs font-bold text-zinc-500 uppercase tracking-widest sticky top-0 z-10">
-                    <th className="py-3.5 px-6">Timestamp</th>
-                    <th className="py-3.5 px-6">Source</th>
-                    <th className="py-3.5 px-6">Violation class</th>
-                    <th className="py-3.5 px-6">Severity</th>
-                    <th className="py-3.5 px-6">Confidence</th>
-                    <th className="py-3.5 px-6 text-right">Reasoning</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-900 text-sm">
-                  {recentDetectionsHistory.length > 0 ? (
-                    recentDetectionsHistory.map((evt) => (
-                      <tr 
-                        key={evt._id} 
-                        className={`hover:bg-zinc-900/20 transition ${
-                          evt.threat_level === 'CRITICAL' ? 'bg-red-500/5' :
-                          evt.threat_level === 'HIGH' ? 'bg-amber-500/5' : ''
-                        }`}
-                      >
-                        <td className="py-3 px-6 text-zinc-400">
-                          {new Date(evt.timestamp).toLocaleTimeString()}
-                        </td>
-                        <td className="py-3 px-6 font-bold text-zinc-300">{evt.camera_id}</td>
-                        <td className="py-3 px-6 text-zinc-200 font-extrabold">{evt.event_type}</td>
-                        <td className="py-3 px-6">
-                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${
-                            evt.threat_level === 'CRITICAL' ? 'bg-red-950/60 text-red-400 border-red-800/40' :
-                            evt.threat_level === 'HIGH' ? 'bg-amber-950/60 text-amber-400 border-amber-800/40' :
-                            evt.threat_level === 'MEDIUM' ? 'bg-yellow-950/60 text-yellow-400 border-yellow-800/40' :
-                            'bg-emerald-950/60 text-emerald-400 border-emerald-800/40'
-                          }`}>
-                            {evt.threat_level}
-                          </span>
-                        </td>
-                        <td className="py-3 px-6 font-mono font-bold text-zinc-450">{Math.round(evt.confidence * 100)}%</td>
-                        <td className="py-3 px-6 text-right">
-                          <button
-                            onClick={() => {
-                              setActiveXAIEvent(evt);
-                              setActiveXAIExplanation(evt.xai_explanation || null);
-                              setIsXAIModalOpen(true);
-                            }}
-                            className="bg-zinc-800 hover:bg-zinc-700 text-emerald-400 hover:text-emerald-300 px-2.5 py-1 rounded text-xs font-mono font-bold inline-flex items-center gap-1 transition"
-                          >
-                            <Brain className="w-3.5 h-3.5" /> Explain
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={6} className="py-8 text-center text-zinc-650 uppercase tracking-widest text-xs font-semibold">
-                        Awaiting incident alert feeds...
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Activity className="h-5 w-5 text-emerald-400" />
+              <h2 className="text-md font-bold tracking-wider text-zinc-300 uppercase">
+                Camera Health & Real-Time Telemetry
+              </h2>
             </div>
+            <button
+              onClick={loadHealth}
+              className="bg-zinc-900 hover:bg-zinc-800 text-xs text-zinc-400 hover:text-white px-3 py-1 rounded-lg border border-zinc-800 transition"
+            >
+              Refresh Telemetry
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {healthList.map((cam) => (
+              <div
+                key={cam.id || cam.camera_id}
+                className="bg-zinc-900/60 border border-zinc-800 hover:border-zinc-700 rounded-xl p-4 shadow-lg flex flex-col justify-between gap-3"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-[11px] font-mono text-emerald-400 font-bold">{cam.camera_id}</div>
+                    <h3 className="text-sm font-bold text-white truncate max-w-[160px]">{cam.camera_name}</h3>
+                  </div>
+                  {getStatusBadge(cam.status, cam.freeze_detected, cam.tamper_detected)}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 bg-zinc-950/80 p-2.5 rounded-lg border border-zinc-800/80 text-xs font-mono">
+                  <div>
+                    <div className="text-zinc-500 text-[10px] flex items-center gap-1">
+                      <Radio className="w-3 h-3 text-cyan-400" /> FPS
+                    </div>
+                    <div className={`text-sm font-bold ${cam.fps < 10 ? 'text-red-400 animate-pulse' : 'text-emerald-400'}`}>
+                      {cam.fps.toFixed(1)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-zinc-500 text-[10px] flex items-center gap-1">
+                      <Zap className="w-3 h-3 text-yellow-400" /> Latency
+                    </div>
+                    <div className="text-sm font-bold text-white">
+                      {cam.latency_ms} ms
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-[10px] font-mono text-zinc-500 flex justify-between border-t border-zinc-800/80 pt-2">
+                  <span>Heartbeat:</span>
+                  <span className="text-zinc-300">
+                    {cam.last_ping ? new Date(cam.last_ping).toLocaleTimeString() : 'Active'}
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
         {/* Modal: Red Emergency Alert Pop-up */}
         {isAlertModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-            <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => setIsAlertModalOpen(false)} />
+            <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={handleDismissModal} />
             <div className="relative w-full max-w-xl bg-zinc-950 border-2 border-red-500 rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(239,68,68,0.3)] z-10 animate-in fade-in zoom-in duration-200">
               
               {/* Header banner */}
@@ -752,7 +802,7 @@ export const LiveMonitoring: React.FC = () => {
                 <div className="flex items-center justify-end space-x-3 pt-2">
                   <button
                     onClick={() => {
-                      setIsAlertModalOpen(false);
+                      handleDismissModal();
                       setIsXAIModalOpen(true);
                     }}
                     className="bg-emerald-950 hover:bg-emerald-900 border border-emerald-700 text-emerald-300 font-bold py-3 px-4 rounded-xl tracking-wider uppercase transition flex items-center justify-center gap-2"

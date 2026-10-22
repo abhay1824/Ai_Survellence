@@ -9,38 +9,26 @@ from app.schemas.camera import CameraCreate, CameraUpdate
 logger = logging.getLogger(__name__)
 
 def get_access_location() -> tuple[float, float]:
-    """Fetch live access point geolocation from public IP, fallback to Bengaluru coordinates if offline."""
-    try:
-        import urllib.request, json
-        req = urllib.request.Request("http://ip-api.com/json/", headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=3) as resp:
-            data = json.loads(resp.read().decode())
-            if data.get("status") == "success":
-                lat = float(data.get("lat"))
-                lon = float(data.get("lon"))
-                logger.info(f"Detected live access location: Lat {lat}, Lon {lon} ({data.get('city')}, {data.get('country')})")
-                return lat, lon
-    except Exception as e:
-        logger.warning(f"Could not resolve IP geolocation: {e}")
-    return 12.9716, 77.5946
+    """Fetch live access point geolocation, fallback to Vijayapura coordinates."""
+    return 16.8302, 75.7100
 
 async def seed_cameras():
-    """Seed initial smart city / SOC demonstration cameras centered on Bengaluru with live OpenCV / Stream URLs."""
+    """Seed initial smart city / SOC demonstration cameras centered on Vijayapura with live OpenCV / Stream URLs."""
     camera_col = get_camera_collection()
     count = await camera_col.count_documents({})
     
-    # Bengaluru key surveillance nodes with live webcam and sample dataset video feeds
-    bengaluru_cameras = [
-        ("CAM-001", "MG Road Command Center Node", 12.9756, 77.6066, "0", "Online"),
-        ("CAM-002", "Indiranagar 100ft Road Junction", 12.9784, 77.6408, "sample_videos/fight.mp4", "Online"),
-        ("CAM-003", "Koramangala Signal Node", 12.9352, 77.6245, "sample_videos/accident.mp4", "Online"),
-        ("CAM-004", "Electronic City Phase 1 Gate", 12.8452, 77.6602, "sample_videos/weapon.mp4", "Online"),
-        ("CAM-005", "Manyata Tech Park Perimeter", 13.0454, 77.6200, "sample_videos/normal.mp4", "Online")
+    # Smart city / SOC demonstration cameras with live webcam and sample dataset video feeds
+    cameras_seed = [
+        ("CAM-001", "Cam 1", 16.8302, 75.7100, "0", "Online"),
+        ("CAM-002", "Cam 2", 16.8280, 75.7180, "sample_videos/fight.mp4", "Online"),
+        ("CAM-003", "Cam 3", 16.8350, 75.7050, "sample_videos/accident.mp4", "Online"),
+        ("CAM-004", "Cam 4", 16.8220, 75.7150, "sample_videos/weapon.mp4", "Online"),
+        ("CAM-005", "Cam 5", 16.8400, 75.7200, "sample_videos/normal.mp4", "Online")
     ]
     
     if count == 0:
-        logger.info("Seeding command center surveillance nodes in Bengaluru...")
-        for cid, name, lat, lon, stream, status_val in bengaluru_cameras:
+        logger.info("Seeding command center surveillance nodes...")
+        for cid, name, lat, lon, stream, status_val in cameras_seed:
             camera_in = CameraDB(
                 camera_id=cid,
                 camera_name=name,
@@ -53,20 +41,21 @@ async def seed_cameras():
                 created_at=datetime.utcnow()
             )
             await camera_col.insert_one(camera_in.model_dump())
-        logger.info("Seeded 5 surveillance nodes in Bengaluru.")
+        logger.info("Seeded 5 surveillance nodes.")
     else:
-        # Migrate existing DB entries away from synthetic to sample video files
-        for cid, name, lat, lon, stream, status_val in bengaluru_cameras:
+        # Migrate existing DB entries away from synthetic to sample video files and update camera coordinates/names
+        for cid, name, lat, lon, stream, status_val in cameras_seed:
             existing = await camera_col.find_one({"camera_id": cid})
             if existing:
                 updates = {}
                 if existing.get("stream_url") == "synthetic":
                     updates["stream_url"] = stream
                     updates["status"] = status_val
-                # Ensure coordinates are in Bengaluru area
-                if abs(existing.get("latitude", 0) - 12.97) > 2.0:
+                # Ensure coordinates are in Vijayapura area
+                if abs(existing.get("latitude", 0) - 16.83) > 1.0:
                     updates["latitude"] = lat
                     updates["longitude"] = lon
+                if existing.get("camera_name") != name:
                     updates["camera_name"] = name
                 if updates:
                     await camera_col.update_one({"camera_id": cid}, {"$set": updates})

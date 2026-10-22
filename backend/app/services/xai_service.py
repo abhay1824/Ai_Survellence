@@ -457,7 +457,10 @@ class XAIService:
             else:
                 brief_reason = f"Observed fight-like behavior detected with {fight_conf_pct}% confidence. Threat score: {threat_score} ({threat_level})."
         elif primary_weapon_name:
-            brief_reason = f"A {primary_weapon_name.lower()} has been detected on Person ID {primary_track_id or 'Unknown'} with score {threat_score} ({threat_level})."
+            if any(d.get("is_unattended", False) for d in weapon_dets):
+                brief_reason = f"An unattended {primary_weapon_name.lower()} has been detected with score {threat_score} ({threat_level})."
+            else:
+                brief_reason = f"A {primary_weapon_name.lower()} has been detected on Person ID {primary_track_id or 'Unknown'} with score {threat_score} ({threat_level})."
         elif active_events:
             brief_reason = f"Alert triggered by {active_events[0].get('event_type')} with threat score {threat_score} ({threat_level})."
         else:

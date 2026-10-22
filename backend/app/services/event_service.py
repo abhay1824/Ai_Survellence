@@ -5,6 +5,7 @@ import uuid
 from bson import ObjectId
 from fastapi import HTTPException
 import pandas as pd
+from app.core.config import settings
 from app.core.database import get_event_collection, get_camera_collection
 from app.models.event import EventDB
 from app.models.camera import CameraStatus
@@ -39,14 +40,23 @@ def _is_email_cooldown_active(camera_id: str, event_type: str) -> bool:
 
 def _should_trigger_email(camera_id: str, event_type: str, threat_level: str, accident_detected: bool = False) -> bool:
     """Determine if an event should trigger email notification with flood protection."""
+    if not getattr(settings, "EMAIL_ENABLED", True):
+        return False
+
+    event_upper = event_type.upper()
+    is_unattended = "UNATTENDED" in event_upper
+
+    # An unattended weapon event at MEDIUM must NEVER email
+    if is_unattended and threat_level == "MEDIUM":
+        return False
+
     will_trigger = False
     
-    # Always trigger for HIGH and CRITICAL threat levels or accident detections
+    # Trigger for HIGH and CRITICAL threat levels or accident detections
     if accident_detected or threat_level in ("HIGH", "CRITICAL"):
         will_trigger = True
-    else:
-        # Trigger for specific dangerous event types regardless of level
-        event_upper = event_type.upper()
+    elif not is_unattended:
+        # Trigger for specific dangerous attended event types regardless of level
         for trigger in EMAIL_TRIGGER_EVENTS:
             if trigger in event_upper:
                 will_trigger = True
@@ -583,3 +593,29 @@ async def get_daily_digest_stats() -> dict:
         "accident_detections": accident_detections,
         "top_cameras": top_cameras
     }
+
+async def delete_event(event_id: str) -> dict:
+    """Delete a single event and its associated evidence files."""
+    event_col = get_event_collection()
+    query = {"$or": [{"event_id": event_id}]}
+    if ObjectId.is_valid(event_id):
+        query["$or"].append({"_id": ObjectId(event_id)})
+
+    event_doc = await event_col.find_one(query)
+    if not event_doc:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    img_path = event_doc.get("image_path")
+    if img_path:
+        try:
+            from pathlib import Path
+            clean_path = img_path.lstrip("/\\")
+            p = Path(__file__).resolve().parent.parent.parent / clean_path
+            if p.exists() and p.is_file():
+                p.unlink()
+        except Exception as e:
+            logger.warning(f"Could not delete image file {img_path}: {e}")
+
+    res = await event_col.delete_one({"_id": event_doc["_id"]})
+    return {"success": res.deleted_count > 0, "event_id": event_id}
+

@@ -11,6 +11,12 @@ load_dotenv(os.path.join(_backend_dir, ".env"))
 load_dotenv(os.path.join(_project_root, ".env"))
 load_dotenv()
 
+def _resolve_model_path(primary_rel: str, fallback_rel: str) -> str:
+    primary = os.path.join(_project_root, primary_rel)
+    if os.path.exists(primary):
+        return primary
+    return os.path.join(_project_root, fallback_rel)
+
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Smart Surveillance & Crime Monitoring"
     API_V1_STR: str = "/api"
@@ -22,42 +28,57 @@ class Settings(BaseSettings):
     DATABASE_NAME: str = "surveillance_db"
     RESET_DB_ON_START: bool = os.getenv("RESET_DB_ON_START", "false").lower() in ("true", "1", "yes")
     
-    # AI Config
+    # AI Config — Unified weights/ registry with legacy fallbacks
     WEAPON_MODEL_PATH: str = os.getenv(
         "WEAPON_MODEL_PATH",
-        os.path.join(
-            _project_root,
-            "OD-WeaponDetection",
-            "Weapons and similar handled objects",
-            "Sohas_weapon-Detection-YOLOv5",
-            "runs",
-            "detect",
-            "weapon6cls",
-            "weights",
-            "best.pt"
+        _resolve_model_path(
+            os.path.join("weights", "weapon_yolov5.pt"),
+            os.path.join(
+                "OD-WeaponDetection",
+                "Weapons and similar handled objects",
+                "Sohas_weapon-Detection-YOLOv5",
+                "runs",
+                "detect",
+                "weapon6cls",
+                "weights",
+                "best.pt"
+            )
         )
     )
     FIGHT_MODEL_PATH: str = os.getenv(
         "FIGHT_MODEL_PATH",
-        os.path.join(_project_root, "runs", "classify", "fight_classifier", "weights", "best.pt")
+        _resolve_model_path(
+            os.path.join("weights", "fight_yolo11n_cls.pt"),
+            os.path.join("runs", "classify", "fight_classifier", "weights", "best.pt")
+        )
     )
+    FIGHT_MIN_PERSONS_TO_RUN: int = int(os.getenv("FIGHT_MIN_PERSONS_TO_RUN", "2"))
+    FIGHT_CONFIRM_MIN_PERSONS_SEEN: int = int(os.getenv("FIGHT_CONFIRM_MIN_PERSONS_SEEN", "4"))
     ACCIDENT_MODEL_PATH: str = os.getenv(
         "ACCIDENT_MODEL_PATH",
-        os.path.join(_project_root, "runs", "detect", "accident_detector", "weights", "best.pt")
+        _resolve_model_path(
+            os.path.join("weights", "accident_yolov8.pt"),
+            os.path.join("runs", "detect", "accident_detector", "weights", "best.pt")
+        )
     )
+    ACCIDENT_CONFIDENCE_THRESHOLD: float = float(os.getenv("ACCIDENT_CONFIDENCE_THRESHOLD", "0.52"))
     PERSON_MODEL_PATH: str = os.getenv(
         "PERSON_MODEL_PATH",
-        os.path.join(_project_root, "yolo11s.pt")
+        _resolve_model_path(
+            os.path.join("weights", "person_yolo11s.pt"),
+            "yolo11s.pt"
+        )
     )
     YOLO_MODEL: str = WEAPON_MODEL_PATH
     CONFIDENCE_THRESHOLD: float = 0.35
-    WEAPON_CONFIDENCE_THRESHOLD: float = 0.50
+    WEAPON_CONFIDENCE_THRESHOLD: float = 0.38
     SECURITY_CLASSES: set = {"pistol", "knife"}
     BASE_THREAT_SCORES: dict = {"pistol": 80, "knife": 60}
+    UNATTENDED_HIGH_AFTER_FRAMES: int = int(os.getenv("UNATTENDED_HIGH_AFTER_FRAMES", "30"))
 
     # Paths
-    SCREENSHOTS_DIR: str = os.path.join(_project_root, "screenshots")
-    EVENT_CLIPS_DIR: str = os.path.join(_project_root, "event_clips")
+    SCREENSHOTS_DIR: str = os.getenv("SCREENSHOTS_DIR", os.path.join(_project_root, "screenshots"))
+    EVENT_CLIPS_DIR: str = os.getenv("EVENT_CLIPS_DIR", os.path.join(_project_root, "event_clips"))
 
     # Email / SMTP Configuration
     SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
@@ -70,6 +91,7 @@ class Settings(BaseSettings):
     EMAIL_ENABLED: bool = os.getenv("EMAIL_ENABLED", "true").lower() == "true"
     EMAIL_RETRY_ATTEMPTS: int = int(os.getenv("EMAIL_RETRY_ATTEMPTS", "3"))
     EMAIL_RETRY_DELAY: int = int(os.getenv("EMAIL_RETRY_DELAY", "5"))
+    ALERT_RECIPIENT_EMAIL: str = os.getenv("ALERT_RECIPIENT_EMAIL", "shabella271@gmail.com")
 
     class Config:
         case_sensitive = True

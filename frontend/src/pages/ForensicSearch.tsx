@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Image as ImageIcon, Video, Download, X } from 'lucide-react';
+import { Search, Image as ImageIcon, Download, X, Trash2 } from 'lucide-react';
 import type { SurveillanceEvent, Camera } from '../types/surveillance';
 import { eventService } from '../services/event';
 import { cameraService } from '../services/camera';
@@ -52,6 +52,21 @@ export const ForensicSearch: React.FC = () => {
     }
   };
 
+  const handleDeleteEvent = async (eventId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!window.confirm('Delete this surveillance evidence image?')) return;
+    try {
+      await eventService.deleteEvent(eventId);
+      setEvents(prev => prev.filter(ev => ev.event_id !== eventId && ev._id !== eventId));
+      if (selectedEvent && (selectedEvent.event_id === eventId || selectedEvent._id === eventId)) {
+        setSelectedEvent(null);
+      }
+    } catch (err) {
+      console.error('Delete failed:', err);
+      alert('Failed to delete evidence.');
+    }
+  };
+
   const resetFilters = () => {
     setStartDate('');
     setEndDate('');
@@ -70,12 +85,19 @@ export const ForensicSearch: React.FC = () => {
           <Search className="w-7 h-7 text-emerald-400" />
           <div>
             <h1 className="text-xl font-bold text-white tracking-wide uppercase">FORENSIC SEARCH ENGINE</h1>
-            <p className="text-xs text-zinc-400">Search historical surveillance incidents, evidence clips, and metadata</p>
+            <p className="text-xs text-zinc-400">Search historical surveillance incidents, evidence captures, and metadata</p>
           </div>
         </div>
 
         <button
-          onClick={() => window.open(eventService.getExportCSVUrl({ camera_id: selectedCamera }), '_blank')}
+          onClick={async () => {
+            try {
+              await eventService.downloadExportCSV({ camera_id: selectedCamera || undefined });
+            } catch (err) {
+              console.error('CSV export failed:', err);
+              alert('Failed to export CSV.');
+            }
+          }}
           className="bg-zinc-800 hover:bg-zinc-700 text-white text-xs px-4 py-2 rounded-lg font-semibold flex items-center gap-2 border border-zinc-700 transition"
         >
           <Download className="w-4 h-4 text-emerald-400" /> Export Results (CSV)
@@ -114,7 +136,7 @@ export const ForensicSearch: React.FC = () => {
             <option value="">All Cameras</option>
             {cameras.map((c) => (
               <option key={c.camera_id} value={c.camera_id}>
-                {c.camera_id} - {c.camera_name}
+                {c.camera_name}
               </option>
             ))}
           </select>
@@ -200,11 +222,14 @@ export const ForensicSearch: React.FC = () => {
                     {evt.threat_level} (+{evt.threat_score})
                   </div>
 
-                  {evt.video_path && (
-                    <div className="absolute bottom-2 right-2 bg-red-950/90 text-red-300 border border-red-800 px-2 py-0.5 rounded text-[10px] font-mono font-bold flex items-center gap-1">
-                      <Video className="w-3 h-3" /> VIDEO CLIP
-                    </div>
-                  )}
+                  {/* Delete button overlay on card */}
+                  <button
+                    onClick={(e) => handleDeleteEvent(evt.event_id || evt._id, e)}
+                    className="absolute top-2 right-2 bg-red-950/90 hover:bg-red-800 text-red-300 p-1.5 rounded border border-red-700 opacity-0 group-hover:opacity-100 transition shadow"
+                    title="Delete Image"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
 
                 {/* Card Content */}
@@ -237,24 +262,25 @@ export const ForensicSearch: React.FC = () => {
                 <h3 className="text-base font-bold text-white font-mono">{selectedEvent.event_type}</h3>
                 <p className="text-xs text-zinc-400 font-mono">Event ID: {selectedEvent.event_id}</p>
               </div>
-              <button
-                onClick={() => setSelectedEvent(null)}
-                className="text-zinc-400 hover:text-white p-1 rounded hover:bg-zinc-800"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleDeleteEvent(selectedEvent.event_id || selectedEvent._id)}
+                  className="bg-red-950/80 hover:bg-red-900 border border-red-800 text-red-300 text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition font-semibold"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Delete Image
+                </button>
+                <button
+                  onClick={() => setSelectedEvent(null)}
+                  className="text-zinc-400 hover:text-white p-1 rounded hover:bg-zinc-800"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
-            {/* Video or Image Preview */}
-            <div className="w-full aspect-video bg-black border border-zinc-800 rounded-lg overflow-hidden flex items-center justify-center">
-              {selectedEvent.video_path ? (
-                <video
-                  src={`${API_BASE_URL.replace('/api', '')}${selectedEvent.video_path}`}
-                  controls
-                  autoPlay
-                  className="w-full h-full object-contain"
-                />
-              ) : selectedEvent.image_path ? (
+            {/* Image Preview */}
+            <div className="w-full aspect-video bg-black border border-zinc-800 rounded-lg overflow-hidden flex items-center justify-center relative">
+              {selectedEvent.image_path ? (
                 <img
                   src={`${API_BASE_URL.replace('/api', '')}${selectedEvent.image_path}`}
                   alt="Evidence"
