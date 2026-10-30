@@ -66,8 +66,9 @@ backend/event_clips/*
 !backend/event_clips/.gitkeep
 backend/screenshots/*
 !backend/screenshots/.gitkeep
-sample_videos/*.mp4
-sample_videos/*.avi
+# Allow sample videos used for demo cameras (CAM-002, CAM-003, CAM-004, CAM-005)
+!sample_videos/
+!sample_videos/*.mp4
 
 # 7. Scratch & Temporary Experiment Artifacts
 scratch/
@@ -77,6 +78,7 @@ scratch/
 !backend/tests/fixtures/*.jpg
 !backend/tests/fixtures/*.png
 *.mp4
+!sample_videos/*.mp4
 !backend/tests/fixtures/*.mp4
 *.pdf
 !backend/tests/fixtures/*.pdf
